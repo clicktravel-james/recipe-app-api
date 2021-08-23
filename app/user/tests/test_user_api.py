@@ -7,6 +7,7 @@ from rest_framework import status
 
 CREATE_USER_URL = reverse('user:create')
 TOKEN_URL = reverse('user:token')
+ME_URL = reverse('user:me')
 
 
 def create_user(**params):
@@ -17,7 +18,7 @@ class PublicUserApiTests(TestCase):
     """Test the users public API"""
 
     def setUp(self):
-        self.clinet = APIClient()
+        self.client = APIClient()
 
     def test_create_valid_user_success(self):
         """Test creating a new valid user"""
@@ -29,7 +30,7 @@ class PublicUserApiTests(TestCase):
         }
 
         """When"""
-        res = self.clinet.post(CREATE_USER_URL, payload)
+        res = self.client.post(CREATE_USER_URL, payload)
 
         """Then"""
         self.assertEqual(res.status_code, status.HTTP_201_CREATED)
@@ -48,7 +49,7 @@ class PublicUserApiTests(TestCase):
         create_user(**payload)
 
         """When"""
-        res = self.clinet.post(CREATE_USER_URL, payload)
+        res = self.client.post(CREATE_USER_URL, payload)
 
         """Then"""
         self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
@@ -63,7 +64,7 @@ class PublicUserApiTests(TestCase):
         }
 
         """When"""
-        res = self.clinet.post(CREATE_USER_URL, payload)
+        res = self.client.post(CREATE_USER_URL, payload)
 
         """Then"""
         self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
@@ -82,7 +83,7 @@ class PublicUserApiTests(TestCase):
         create_user(**payload)
 
         """When"""
-        res = self.clinet.post(TOKEN_URL, payload)
+        res = self.client.post(TOKEN_URL, payload)
 
         """Then"""
         self.assertEqual(res.status_code, status.HTTP_200_OK)
@@ -99,7 +100,7 @@ class PublicUserApiTests(TestCase):
         }
 
         """When"""
-        res = self.clinet.post(TOKEN_URL, payload)
+        res = self.client.post(TOKEN_URL, payload)
 
         """Then"""
         self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
@@ -114,7 +115,7 @@ class PublicUserApiTests(TestCase):
         }
 
         """When"""
-        res = self.clinet.post(TOKEN_URL, payload)
+        res = self.client.post(TOKEN_URL, payload)
 
         """Then"""
         self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
@@ -129,8 +130,58 @@ class PublicUserApiTests(TestCase):
         }
 
         """When"""
-        res = self.clinet.post(TOKEN_URL, payload)
+        res = self.client.post(TOKEN_URL, payload)
 
         """Then"""
         self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertNotIn('token', res.data)
+
+
+class PrivateUserApiTests(TestCase):
+    """"Tests for the the Users private API"""
+
+    def setUp(self):
+        self.user = create_user(
+            email='test.jenkins@clicktravel.com',
+            password='testpass',
+            name='My Name',
+        )
+        self.client = APIClient()
+        self.client.force_authenticate(user=self.user)
+
+    def test_a_users_details_are_returned_with_authed_get_request(self):
+        """Test that with authorisation the user detail's are returned"""
+        """When"""
+        res = self.client.get(ME_URL)
+
+        """Then"""
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(res.data, {
+            'email': self.user.email,
+            'name': self.user.name,
+        })
+
+    def test_posting_to_a_user_is_not_allowed(self):
+        """Test that you cannot create a user via post"""
+        """When"""
+        res = self.client.post(ME_URL, {})
+
+        """Then"""
+        self.assertEqual(res.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
+
+    def test_update_users_profile(self):
+        """Test you can update a user when authenticated"""
+        """Given """
+        payload = {
+            'name': 'Jimmo Jenkins',
+            'password': 'Password1',
+        }
+
+        """When"""
+        res = self.client.patch(ME_URL, payload)
+
+        """Then"""
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.name, payload['name'])
+        self.assertTrue(self.user.check_password(payload['password']))
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
