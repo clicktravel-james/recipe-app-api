@@ -75,7 +75,7 @@ class ModelTests(TestCase):
         self.assertEquals(str(recipe), recipe.title)
 
     @patch('uuid.uuid4')
-    def text_recipe_file_name_uuid(self, mock_uuid):
+    def test_recipe_file_name_uuid(self, mock_uuid):
         """Test for filename unique names"""
         """Given"""
         uuid = 'test-uuid'
@@ -86,7 +86,3 @@ class ModelTests(TestCase):
 
         """Then"""
         self.assertEqual(file_path, expected_path)
-
-
-
-
