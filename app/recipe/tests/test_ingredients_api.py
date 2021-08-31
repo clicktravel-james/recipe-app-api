@@ -5,7 +5,7 @@ from django.urls import reverse
 from rest_framework.test import APIClient
 from rest_framework import status
 
-from core.models import Ingredient
+from core.models import Ingredient, Recipe
 
 from recipe.serializers import IngredientSerializer
 
@@ -93,3 +93,50 @@ class PrivateTagsApiTests(TestCase):
 
         """Then"""
         self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_retrieved_ingredients_assigned_to_a_recipe(self):
+        """Given"""
+        ingredient1 = Ingredient.objects.create(user=self.user, name="Orange")
+        ingredient2 = Ingredient.objects.create(user=self.user, name="Salmon")
+        recipe = Recipe.objects.create(
+            title='Orange cheesecake',
+            time_minutes=10,
+            price=5.00,
+            user=self.user,
+        )
+        recipe.ingredients.add(ingredient1)
+
+        """When"""
+        res = self.client.get(INGREDIENTS_URL, {'assigned_only': 1})
+
+        """Then"""
+        serializer1 = IngredientSerializer(ingredient1)
+        serializer2 = IngredientSerializer(ingredient2)
+        self.assertIn(serializer1.data, res.data)
+        self.assertNotIn(serializer2.data, res.data)
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+
+    def test_retrieved_ingredients_assigned_unique(self):
+        """Given"""
+        ingredient1 = Ingredient.objects.create(user=self.user, name="Orange")
+        Ingredient.objects.create(user=self.user, name="Salmon")
+        recipe1 = Recipe.objects.create(
+            title='Ice cream sunday',
+            time_minutes=10,
+            price=5.00,
+            user=self.user,
+        )
+        recipe1.ingredients.add(ingredient1)
+        recipe2 = Recipe.objects.create(
+            title='Ice cream cake',
+            time_minutes=5,
+            price=15.00,
+            user=self.user,
+        )
+        recipe2.ingredients.add(ingredient1)
+
+        """When"""
+        res = self.client.get(INGREDIENTS_URL, {'assigned_only': 1})
+
+        """Then"""
+        self.assertEqual(len(res.data), 1)
